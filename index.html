@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水稻害虫识别系统</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px 0;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 8px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+
+        .intro {
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto 30px;
+        }
+
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .upload-section, .result-section {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h2 {
+            color: #2E7D32;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+
+        .upload-box {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-box:hover {
+            border-color: #4CAF50;
+            background-color: #f9f9f9;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background-color: #3d8b40;
+        }
+
+        .preview-section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        #image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .result-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .result-content {
+            width: 100%;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background-color: #f1f8e9;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .top-result {
+            background-color: #e8f5e9;
+            border-left-color: #2E7D32;
+            font-weight: bold;
+        }
+
+        .confidence {
+            color: #2E7D32;
+            font-weight: bold;
+        }
+
+        .loading {
+            margin-top: 20px;
+            display: none;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            color: #666;
+            padding: 20px;
+        }
+
+        .class-list {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .class-list h3 {
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        .class-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .class-tag {
+            background-color: #e8f5e9;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>水稻害虫识别系统</h1>
+            <p>上传水稻叶片图片，自动识别害虫种类</p>
+        </header>
+
+        <p class="intro">
+            该系统基于深度学习技术，可识别常见的水稻害虫（如稻飞虱、二化螟、稻纵卷叶螟等）。
+            请上传清晰的包含害虫的水稻图片，系统将快速分析并返回识别结果。
+        </p>
+
+        <div class="main-content">
+            <section class="upload-section">
+                <h2>上传图片</h2>
+                <div class="upload-box" id="upload-box">
+                    <div class="upload-icon">📷</div>
+                    <p>点击或拖拽图片到此处</p>
+                    <p class="small-text">支持 JPG、PNG 格式</p>
+                    <input type="file" id="file-input" accept="image/jpeg, image/png">
+                </div>
+                <button class="btn" id="predict-btn">开始识别</button>
+
+                <div class="preview-section" id="preview-section">
+                    <h3>预览图片</h3>
+                    <img id="image-preview" src="" alt="预览图">
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="loading-spinner"></div>
+                    <p>正在识别中，请稍候...</p>
+                </div>
+            </section>
+
+            <section class="result-section">
+                <h2>识别结果</h2>
+                <div class="result-content" id="result-content">
+                    <div class="result-item top-result">
+                        <p>预测种类: <span id="predicted-class">--</span></p>
+                        <p>置信度: <span id="confidence" class="confidence">--</span></p>
+                    </div>
+                    <h3>可能的其他种类:</h3>
+                    <div id="top-classes">
+                        <!-- 动态生成其他可能的种类 -->
+                    </div>
+                </div>
+
+                <div class="class-list">
+                    <h3>支持识别的害虫种类</h3>
+                    <div class="class-tags">
+                        <span class="class-tag">稻飞虱</span>
+                        <span class="class-tag">二化螟</span>
+                        <span class="class-tag">稻纵卷叶螟</span>
+                        <span class="class-tag">稻蓟马</span>
+                        <span class="class-tag">稻象甲</span>
+                        <span class="class-tag">稻螟蛉</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>水稻害虫识别系统 &copy; 2023 | 基于深度学习的农业病虫害识别工具</p>
+        </footer>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const uploadBox = document.getElementById('upload-box');
+        const fileInput = document.getElementById('file-input');
+        const imagePreview = document.getElementById('image-preview');
+        const previewSection = document.getElementById('preview-section');
+        const predictBtn = document.getElementById('predict-btn');
+        const loading = document.getElementById('loading');
+        const resultContent = document.getElementById('result-content');
+        const predictedClass = document.getElementById('predicted-class');
+        const confidence = document.getElementById('confidence');
+        const topClasses = document.getElementById('top-classes');
+
+        // 点击上传区域触发文件选择
+        uploadBox.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 拖拽功能
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#4CAF50';
+            uploadBox.style.backgroundColor = '#f1f8e9';
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.style.borderColor = '#ccc';
+            uploadBox.style.backgroundColor = 'transparent';
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.style.borderColor = '#ccc';
+            uploadBox.style.backgroundColor = 'transparent';
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelection();
+            }
+        });
+
+        // 处理文件选择
+        fileInput.addEventListener('change', handleFileSelection);
+
+        function handleFileSelection() {
+            const file = fileInput.files[0];
+            if (file) {
+                // 显示预览
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    previewSection.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 预测按钮点击事件
+        predictBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('请先上传图片');
+                return;
+            }
+
+            // 显示加载状态
+            loading.style.display = 'block';
+            resultContent.style.display = 'none';
+
+            // 模拟API请求（实际项目中需要替换为真实的后端接口）
+            setTimeout(() => {
+                // 模拟识别结果（实际应从后端获取）
+                const mockResult = {
+                    predicted_class: "稻飞虱",
+                    confidence: 92.5,
+                    top_classes: [
+                        { class: "稻飞虱", confidence: 92.5 },
+                        { class: "稻蓟马", confidence: 5.3 },
+                        { class: "稻象甲", confidence: 2.2 }
+                    ]
+                };
+
+                // 显示结果
+                displayResult(mockResult);
+                loading.style.display = 'none';
+                resultContent.style.display = 'block';
+            }, 2000);
+        });
+
+        // 显示识别结果
+        function displayResult(result) {
+            predictedClass.textContent = result.predicted_class;
+            confidence.textContent = `${result.confidence.toFixed(2)}%`;
+            
+            // 清空之前的结果
+            topClasses.innerHTML = '';
+            
+            // 添加其他可能的种类（跳过第一个，因为已经显示在顶部）
+            for (let i = 1; i < result.top_classes.length; i++) {
+                const item = result.top_classes[i];
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `
+                    <p>${item.class}: <span class="confidence">${item.confidence.toFixed(2)}%</span></p>
+                `;
+                topClasses.appendChild(div);
+            }
+        }
+    </script>
+</body>
+</html>
