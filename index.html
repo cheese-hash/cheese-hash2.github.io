@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>水稻害虫识别系统</title>
     <style>
+        <!-- 保持原有的CSS样式不变 -->
         * {
             box-sizing: border-box;
             margin: 0;
@@ -76,10 +77,10 @@
             transition: all 0.3s ease;
         }
 
-        .upload-box:hover {
-            border-color: #4CAF50;
-            background-color: #f9f9f9;
-        }
+            .upload-box:hover {
+                border-color: #4CAF50;
+                background-color: #f9f9f9;
+            }
 
         .upload-icon {
             font-size: 48px;
@@ -103,9 +104,9 @@
             margin-top: 20px;
         }
 
-        .btn:hover {
-            background-color: #3d8b40;
-        }
+            .btn:hover {
+                background-color: #3d8b40;
+            }
 
         .preview-section {
             margin-top: 20px;
@@ -167,8 +168,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         footer {
@@ -185,10 +191,10 @@
             border-radius: 4px;
         }
 
-        .class-list h3 {
-            margin-bottom: 10px;
-            color: #4CAF50;
-        }
+            .class-list h3 {
+                margin-bottom: 10px;
+                color: #4CAF50;
+            }
 
         .class-tags {
             display: flex;
@@ -304,7 +310,7 @@
             e.preventDefault();
             uploadBox.style.borderColor = '#ccc';
             uploadBox.style.backgroundColor = 'transparent';
-            
+
             if (e.dataTransfer.files.length) {
                 fileInput.files = e.dataTransfer.files;
                 handleFileSelection();
@@ -327,7 +333,7 @@
             }
         }
 
-        // 预测按钮点击事件
+        // 预测按钮点击事件 - 修改为调用后端API
         predictBtn.addEventListener('click', () => {
             const file = fileInput.files[0];
             if (!file) {
@@ -339,43 +345,53 @@
             loading.style.display = 'block';
             resultContent.style.display = 'none';
 
-            // 模拟API请求（实际项目中需要替换为真实的后端接口）
-            setTimeout(() => {
-                // 模拟识别结果（实际应从后端获取）
-                const mockResult = {
-                    predicted_class: "稻飞虱",
-                    confidence: 92.5,
-                    top_classes: [
-                        { class: "稻飞虱", confidence: 92.5 },
-                        { class: "稻蓟马", confidence: 5.3 },
-                        { class: "稻象甲", confidence: 2.2 }
-                    ]
-                };
+            // 构建FormData，准备上传图片
+            const formData = new FormData();
+            formData.append('image', file);
 
-                // 显示结果
-                displayResult(mockResult);
-                loading.style.display = 'none';
-                resultContent.style.display = 'block';
-            }, 2000);
+            // 调用后端API（确保后端服务已启动）
+            fetch('http://localhost:5000/api/predict', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('识别请求失败');
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    // 显示识别结果
+                    displayResult(result);
+                    loading.style.display = 'none';
+                    resultContent.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('识别过程出错:', error);
+                    alert('识别失败，请确保后端服务已启动并重新尝试');
+                    loading.style.display = 'none';
+                });
         });
 
         // 显示识别结果
         function displayResult(result) {
-            predictedClass.textContent = result.predicted_class;
-            confidence.textContent = `${result.confidence.toFixed(2)}%`;
-            
+            predictedClass.textContent = result.predicted_class || '未知';
+            confidence.textContent = result.confidence ? `${result.confidence.toFixed(2)}%` : '未知';
+
             // 清空之前的结果
             topClasses.innerHTML = '';
-            
+
             // 添加其他可能的种类（跳过第一个，因为已经显示在顶部）
-            for (let i = 1; i < result.top_classes.length; i++) {
-                const item = result.top_classes[i];
-                const div = document.createElement('div');
-                div.className = 'result-item';
-                div.innerHTML = `
-                    <p>${item.class}: <span class="confidence">${item.confidence.toFixed(2)}%</span></p>
-                `;
-                topClasses.appendChild(div);
+            if (result.top_classes && result.top_classes.length > 1) {
+                for (let i = 1; i < result.top_classes.length; i++) {
+                    const item = result.top_classes[i];
+                    const div = document.createElement('div');
+                    div.className = 'result-item';
+                    div.innerHTML = `
+                                <p>${item.class || '未知'}: <span class="confidence">${item.confidence ? item.confidence.toFixed(2) + '%' : '未知'}</span></p>
+                            `;
+                    topClasses.appendChild(div);
+                }
             }
         }
     </script>
