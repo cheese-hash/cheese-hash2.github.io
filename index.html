@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>水稻害虫识别系统</title>
     <style>
-        <!-- 保持原有的CSS样式不变 -->
+        /* 保持原有CSS样式不变 */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -92,6 +92,18 @@
             display: none;
         }
 
+        .url-input-section {
+            margin-top: 20px;
+        }
+
+        #image-url {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
         .btn {
             background-color: #4CAF50;
             color: white;
@@ -101,7 +113,7 @@
             cursor: pointer;
             font-size: 1rem;
             transition: background-color 0.3s;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
             .btn:hover {
@@ -144,6 +156,8 @@
             background-color: #e8f5e9;
             border-left-color: #2E7D32;
             font-weight: bold;
+            padding: 20px;
+            text-align: center;
         }
 
         .confidence {
@@ -214,7 +228,7 @@
     <div class="container">
         <header>
             <h1>水稻害虫识别系统</h1>
-            <p>上传水稻叶片图片，自动识别害虫种类</p>
+            <p>上传水稻叶片图片或输入图片URL，自动识别害虫种类</p>
         </header>
 
         <p class="intro">
@@ -231,7 +245,12 @@
                     <p class="small-text">支持 JPG、PNG 格式</p>
                     <input type="file" id="file-input" accept="image/jpeg, image/png">
                 </div>
-                <button class="btn" id="predict-btn">开始识别</button>
+
+                <div class="url-input-section">
+                    <h3>或输入图片URL（支持网络URL和data:格式）</h3>
+                    <input type="text" id="image-url" placeholder="例如: https://example.com/pest.jpg 或 data:image/jpeg;base64,...">
+                    <button class="btn" id="url-predict-btn">通过URL识别</button>
+                </div>
 
                 <div class="preview-section" id="preview-section">
                     <h3>预览图片</h3>
@@ -248,12 +267,8 @@
                 <h2>识别结果</h2>
                 <div class="result-content" id="result-content">
                     <div class="result-item top-result">
-                        <p>预测种类: <span id="predicted-class">--</span></p>
+                        <p>最可能的害虫种类: <span id="predicted-class">--</span></p>
                         <p>置信度: <span id="confidence" class="confidence">--</span></p>
-                    </div>
-                    <h3>可能的其他种类:</h3>
-                    <div id="top-classes">
-                        <!-- 动态生成其他可能的种类 -->
                     </div>
                 </div>
 
@@ -282,12 +297,12 @@
         const fileInput = document.getElementById('file-input');
         const imagePreview = document.getElementById('image-preview');
         const previewSection = document.getElementById('preview-section');
-        const predictBtn = document.getElementById('predict-btn');
+        const urlPredictBtn = document.getElementById('url-predict-btn');
+        const imageUrlInput = document.getElementById('image-url');
         const loading = document.getElementById('loading');
         const resultContent = document.getElementById('result-content');
         const predictedClass = document.getElementById('predicted-class');
         const confidence = document.getElementById('confidence');
-        const topClasses = document.getElementById('top-classes');
 
         // 点击上传区域触发文件选择
         uploadBox.addEventListener('click', () => {
@@ -317,7 +332,7 @@
             }
         });
 
-        // 处理文件选择
+        // 处理文件选择，选择后自动识别
         fileInput.addEventListener('change', handleFileSelection);
 
         function handleFileSelection() {
@@ -328,19 +343,37 @@
                 reader.onload = (e) => {
                     imagePreview.src = e.target.result;
                     previewSection.style.display = 'block';
+                    // 自动开始识别
+                    predictFromFile(file);
                 };
                 reader.readAsDataURL(file);
             }
         }
 
-        // 预测按钮点击事件 - 修改为调用后端API
-        predictBtn.addEventListener('click', () => {
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('请先上传图片');
+        // 通过URL识别按钮点击事件
+        urlPredictBtn.addEventListener('click', () => {
+            const url = imageUrlInput.value.trim();
+            if (!url) {
+                alert('请输入图片URL');
                 return;
             }
 
+            // 显示预览
+            imagePreview.src = url;
+            previewSection.style.display = 'block';
+
+            // 检查是否为data:格式的URL
+            if (url.startsWith('data:image/')) {
+                // 处理base64格式图片
+                predictFromDataUrl(url);
+            } else {
+                // 处理普通URL
+                predictFromUrl(url);
+            }
+        });
+
+        // 从文件预测
+        function predictFromFile(file) {
             // 显示加载状态
             loading.style.display = 'block';
             resultContent.style.display = 'none';
@@ -349,7 +382,7 @@
             const formData = new FormData();
             formData.append('image', file);
 
-            // 调用后端API（确保后端服务已启动）
+            // 调用后端API
             fetch('http://localhost:5000/api/predict', {
                 method: 'POST',
                 body: formData
@@ -371,28 +404,83 @@
                     alert('识别失败，请确保后端服务已启动并重新尝试');
                     loading.style.display = 'none';
                 });
-        });
+        }
+
+        // 从普通URL预测
+        function predictFromUrl(url) {
+            // 显示加载状态
+            loading.style.display = 'block';
+            resultContent.style.display = 'none';
+
+            // 调用后端API
+            fetch('http://localhost:5000/api/predict-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url: url })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('识别请求失败');
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    // 显示识别结果
+                    displayResult(result);
+                    loading.style.display = 'none';
+                    resultContent.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('识别过程出错:', error);
+                    alert('识别失败，请检查URL是否有效并重新尝试');
+                    loading.style.display = 'none';
+                });
+        }
+
+        // 从data:格式的URL预测
+        function predictFromDataUrl(dataUrl) {
+            // 显示加载状态
+            loading.style.display = 'block';
+            resultContent.style.display = 'none';
+
+            // 调用后端API，发送base64数据
+            fetch('http://localhost:5000/api/predict-dataurl', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ dataUrl: dataUrl })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('识别请求失败');
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    // 显示识别结果
+                    displayResult(result);
+                    loading.style.display = 'none';
+                    resultContent.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('识别过程出错:', error);
+                    alert('识别失败，请检查data URL格式是否正确并重新尝试');
+                    loading.style.display = 'none';
+                });
+        }
 
         // 显示识别结果
         function displayResult(result) {
+            if (result.error) {
+                alert(result.error);
+                return;
+            }
+
             predictedClass.textContent = result.predicted_class || '未知';
             confidence.textContent = result.confidence ? `${result.confidence.toFixed(2)}%` : '未知';
-
-            // 清空之前的结果
-            topClasses.innerHTML = '';
-
-            // 添加其他可能的种类（跳过第一个，因为已经显示在顶部）
-            if (result.top_classes && result.top_classes.length > 1) {
-                for (let i = 1; i < result.top_classes.length; i++) {
-                    const item = result.top_classes[i];
-                    const div = document.createElement('div');
-                    div.className = 'result-item';
-                    div.innerHTML = `
-                                <p>${item.class || '未知'}: <span class="confidence">${item.confidence ? item.confidence.toFixed(2) + '%' : '未知'}</span></p>
-                            `;
-                    topClasses.appendChild(div);
-                }
-            }
         }
     </script>
 </body>
