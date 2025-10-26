@@ -96,12 +96,18 @@
             margin-top: 20px;
         }
 
-        #image-url {
+        #image-input {
             width: 100%;
             padding: 10px;
             margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
+        }
+
+        .input-hint {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
         }
 
         .btn {
@@ -222,13 +228,19 @@
             border-radius: 12px;
             font-size: 0.9rem;
         }
+
+        .dataset-info {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>水稻害虫识别系统</h1>
-            <p>上传水稻叶片图片或输入图片URL，自动识别害虫种类</p>
+            <p>上传图片或输入图片URL，自动识别害虫种类</p>
         </header>
 
         <p class="intro">
@@ -238,7 +250,7 @@
 
         <div class="main-content">
             <section class="upload-section">
-                <h2>上传图片</h2>
+                <h2>输入图片</h2>
                 <div class="upload-box" id="upload-box">
                     <div class="upload-icon">📷</div>
                     <p>点击或拖拽图片到此处</p>
@@ -247,9 +259,9 @@
                 </div>
 
                 <div class="url-input-section">
-                    <h3>或输入图片URL（支持网络URL和data:格式）</h3>
-                    <input type="text" id="image-url" placeholder="例如: https://example.com/pest.jpg 或 data:image/jpeg;base64,...">
-                    <button class="btn" id="url-predict-btn">通过URL识别</button>
+                    <h3>或输入图片URL</h3>
+                    <p class="input-hint">支持网络图片URL或data:image格式的Base64编码</p>
+                    <input type="text" id="image-input" placeholder="例如: https://example.com/pest.jpg 或 data:image/jpeg;base64,...">
                 </div>
 
                 <div class="preview-section" id="preview-section">
@@ -260,6 +272,11 @@
                 <div class="loading" id="loading">
                     <div class="loading-spinner"></div>
                     <p>正在识别中，请稍候...</p>
+                </div>
+
+                <div class="dataset-info" id="dataset-info">
+                    <h3>数据集信息</h3>
+                    <div id="dataset-stats"></div>
                 </div>
             </section>
 
@@ -295,14 +312,34 @@
         // 获取DOM元素
         const uploadBox = document.getElementById('upload-box');
         const fileInput = document.getElementById('file-input');
+        const imageInput = document.getElementById('image-input');
         const imagePreview = document.getElementById('image-preview');
         const previewSection = document.getElementById('preview-section');
-        const urlPredictBtn = document.getElementById('url-predict-btn');
-        const imageUrlInput = document.getElementById('image-url');
         const loading = document.getElementById('loading');
         const resultContent = document.getElementById('result-content');
         const predictedClass = document.getElementById('predicted-class');
         const confidence = document.getElementById('confidence');
+        const datasetStats = document.getElementById('dataset-stats');
+
+        // 页面加载时获取数据集信息
+        window.addEventListener('load', () => {
+            fetch('http://localhost:5000/api/dataset-info')
+                .then(response => response.json())
+                .then(data => {
+                    let statsHtml = '';
+                    for (const [cls, info] of Object.entries(data)) {
+                        const status = info.exists ?
+                            `<span style="color: green;">存在</span>` :
+                            `<span style="color: red;">不存在</span>`;
+                        statsHtml += `<p>${cls}: ${info.image_count}张图片 (${status})</p>`;
+                    }
+                    datasetStats.innerHTML = statsHtml;
+                })
+                .catch(error => {
+                    console.error('获取数据集信息失败:', error);
+                    datasetStats.innerHTML = '<p>无法获取数据集信息</p>';
+                });
+        });
 
         // 点击上传区域触发文件选择
         uploadBox.addEventListener('click', () => {
@@ -335,6 +372,14 @@
         // 处理文件选择，选择后自动识别
         fileInput.addEventListener('change', handleFileSelection);
 
+        // 输入URL后自动识别（输入框失去焦点或按下回车键）
+        imageInput.addEventListener('blur', handleUrlInput);
+        imageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleUrlInput();
+            }
+        });
+
         function handleFileSelection() {
             const file = fileInput.files[0];
             if (file) {
@@ -350,27 +395,21 @@
             }
         }
 
-        // 通过URL识别按钮点击事件
-        urlPredictBtn.addEventListener('click', () => {
-            const url = imageUrlInput.value.trim();
-            if (!url) {
-                alert('请输入图片URL');
-                return;
+        function handleUrlInput() {
+            const input = imageInput.value.trim();
+            if (input) {
+                // 尝试显示预览
+                try {
+                    imagePreview.src = input;
+                    previewSection.style.display = 'block';
+                    // 自动开始识别
+                    predictFromUrl(input);
+                } catch (error) {
+                    console.error('预览图片失败:', error);
+                    alert('图片URL格式不正确');
+                }
             }
-
-            // 显示预览
-            imagePreview.src = url;
-            previewSection.style.display = 'block';
-
-            // 检查是否为data:格式的URL
-            if (url.startsWith('data:image/')) {
-                // 处理base64格式图片
-                predictFromDataUrl(url);
-            } else {
-                // 处理普通URL
-                predictFromUrl(url);
-            }
-        });
+        }
 
         // 从文件预测
         function predictFromFile(file) {
@@ -383,7 +422,7 @@
             formData.append('image', file);
 
             // 调用后端API
-            fetch('http://localhost:5000/api/predict', {
+            fetch('http://localhost:5000/api/auto-predict', {
                 method: 'POST',
                 body: formData
             })
@@ -401,24 +440,24 @@
                 })
                 .catch(error => {
                     console.error('识别过程出错:', error);
-                    alert('识别失败，请确保后端服务已启动并重新尝试');
+                    alert('识别失败: ' + (error.message || '请重试'));
                     loading.style.display = 'none';
                 });
         }
 
-        // 从普通URL预测
+        // 从URL预测
         function predictFromUrl(url) {
             // 显示加载状态
             loading.style.display = 'block';
             resultContent.style.display = 'none';
 
             // 调用后端API
-            fetch('http://localhost:5000/api/predict-url', {
+            fetch('http://localhost:5000/api/auto-predict', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ url: url })
+                body: JSON.stringify({ input: url })
             })
                 .then(response => {
                     if (!response.ok) {
@@ -434,40 +473,7 @@
                 })
                 .catch(error => {
                     console.error('识别过程出错:', error);
-                    alert('识别失败，请检查URL是否有效并重新尝试');
-                    loading.style.display = 'none';
-                });
-        }
-
-        // 从data:格式的URL预测
-        function predictFromDataUrl(dataUrl) {
-            // 显示加载状态
-            loading.style.display = 'block';
-            resultContent.style.display = 'none';
-
-            // 调用后端API，发送base64数据
-            fetch('http://localhost:5000/api/predict-dataurl', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ dataUrl: dataUrl })
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('识别请求失败');
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    // 显示识别结果
-                    displayResult(result);
-                    loading.style.display = 'none';
-                    resultContent.style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('识别过程出错:', error);
-                    alert('识别失败，请检查data URL格式是否正确并重新尝试');
+                    alert('识别失败: ' + (error.message || '请检查URL是否有效'));
                     loading.style.display = 'none';
                 });
         }
